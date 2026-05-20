@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simplex"
+version = "0.1.0"
+description = "Projeto Simplex de pesquisa operacional"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Chrystian Melo", email = "meloo.chrys@gmail.com"}
+]
+dependencies = []
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["simplex*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]

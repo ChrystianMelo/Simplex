@@ -1,0 +1,54 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv/
+venv/
+ENV/
+env/
+
+# Distribution / packaging
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-wheel-metadata/
+
+# Testing
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+
+# Type checkers
+.pyre/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# C extensions
+cython_debug/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDEs and editors
+.idea/
+.vscode/
+
+# Logs and databases
+*.sqlite3
+*.db
+*.log
