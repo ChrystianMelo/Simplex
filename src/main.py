@@ -1,19 +1,19 @@
-import subprocess
-import sys
+import matplotlib.pyplot as plt
 
-packages = ["networkx", "matplotlib"]
 
-try:
-    import networkx as nx
-    import matplotlib.pyplot as plt
-    print("Pacotes de plotagem de grafico já instalados.")
-except ImportError:
-    print("Instalando pacotes de plotagem de grafico...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", *packages])
-    import networkx as nx
-    import matplotlib.pyplot as plt
-    print("Pacotes instalados com sucesso.")
+def main():
+    x = [0, 1, 2, 3, 4]
+    y = [0, 1, 4, 9, 16]
 
-G = nx.path_graph(4)
-print("Grafico criado para teste:", list(G.edges()))
-print("Ambiente pronto para plotar graficos.")
+    plt.figure()
+    plt.plot(x, y, marker='o')
+    plt.title('Gráfico simples')
+    plt.xlabel('x')
+    plt.ylabel('y = x²')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == '__main__':
+    main()
