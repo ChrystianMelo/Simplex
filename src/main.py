@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from enum import Enum
 
 from simplex.parser import parse_input
-from simplex.standard_form import to_standard_form
 
 
 class PivotPolicy(Enum):
@@ -71,7 +70,6 @@ def main() -> None:
         return
 
     linear_program = parse_input(raw_input)
-    to_standard_form(linear_program)
 
 
 if __name__ == "__main__":
