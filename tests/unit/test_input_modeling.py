@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from main import PivotPolicy, parse_arguments
-from simplex.models import ConstraintRelation, ProblemType
+from simplex.models import ConstraintRelation, DecisionVariableSign, ProblemType
 from simplex.parser import parse_input
 
 
@@ -114,7 +114,11 @@ def test_first_input_files_are_parsed_as_linear_program(
 
     assert linear_program.decision_variable_count == 3
     assert linear_program.constraint_count == constraint_count
-    assert linear_program.decision_variable_signs == [1, 1, 1]
+    assert linear_program.decision_variable_signs == [
+        DecisionVariableSign.POSITIVE,
+        DecisionVariableSign.POSITIVE,
+        DecisionVariableSign.POSITIVE,
+    ]
     assert linear_program.problem_type == ProblemType.MAXIMIZATION
     assert linear_program.objective_function == objective_function
     assert [constraint.coefficients for constraint in linear_program.constraints] == (
@@ -124,3 +128,21 @@ def test_first_input_files_are_parsed_as_linear_program(
         constraint_relations
     )
     assert [constraint.result for constraint in linear_program.constraints] == results
+
+
+def test_parse_input_reads_decision_variable_signs_as_enum() -> None:
+    raw_input = """\
+3
+1
+1 -1 0
+max 1 2 3
+1 1 1 <= 10
+"""
+
+    linear_program = parse_input(raw_input)
+
+    assert linear_program.decision_variable_signs == [
+        DecisionVariableSign.POSITIVE,
+        DecisionVariableSign.NEGATIVE,
+        DecisionVariableSign.FREE,
+    ]

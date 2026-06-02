@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from simplex.models import Constraint, ConstraintRelation, LinearProgram, ProblemType
+from simplex.models import (
+    Constraint,
+    ConstraintRelation,
+    DecisionVariableSign,
+    LinearProgram,
+    ProblemType,
+)
 
 
 def parse_number(value: str) -> float:
@@ -21,6 +27,15 @@ def parse_problem_type(value: str) -> ProblemType:
         raise ValueError("Funcao objetivo deve comecar com 'max' ou 'min'.") from error
 
 
+def parse_decision_variable_sign(value: str) -> DecisionVariableSign:
+    try:
+        return DecisionVariableSign(int(value))
+    except ValueError as error:
+        raise ValueError(
+            "Sinal de variavel de decisao invalido: esperado 1, -1 ou 0."
+        ) from error
+
+
 def parse_input(raw_input: str) -> LinearProgram:
     lines = [line.strip() for line in raw_input.splitlines() if line.strip()]
     if len(lines) < 4:
@@ -29,7 +44,9 @@ def parse_input(raw_input: str) -> LinearProgram:
     decision_variable_count = int(lines[0])
     constraint_count = int(lines[1])
 
-    decision_variable_signs = [int(value) for value in lines[2].split()]
+    decision_variable_signs = [
+        parse_decision_variable_sign(value) for value in lines[2].split()
+    ]
     if len(decision_variable_signs) != decision_variable_count:
         raise ValueError(
             "Quantidade de sinais das variaveis diferente do numero de variaveis."

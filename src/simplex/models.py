@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 
 
 class ConstraintRelation(Enum):
@@ -25,6 +25,19 @@ class ProblemType(Enum):
 
     # Problema de minimização: min z = c^T x.
     MINIMIZATION = "min"
+
+
+class DecisionVariableSign(IntEnum):
+    """Condição de sinal de uma variável de decisão."""
+
+    # Variável positiva: x_j >= 0.
+    POSITIVE = 1
+
+    # Variável negativa: x_j <= 0.
+    NEGATIVE = -1
+
+    # Variável livre: sem restrição de sinal.
+    FREE = 0
 
 
 @dataclass(frozen=True)
@@ -60,9 +73,8 @@ class LinearProgram:
     # Número de restrições do problema original.
     constraint_count: int
 
-    # Condição de sinal de cada variável: 1 para x_j >= 0,
-    # -1 para x_j <= 0 e 0 para variável livre.
-    decision_variable_signs: list[int]
+    # Condição de sinal de cada variável de decisão.
+    decision_variable_signs: list[DecisionVariableSign]
 
     # Tipo do problema: maximização ou minimização da função objetivo.
     problem_type: ProblemType
@@ -73,34 +85,10 @@ class LinearProgram:
     # Lista das restrições lineares do problema.
     constraints: list[Constraint]
 
+    def increase_decision_variable_count(self):
+        self.decision_variable_count += 1
 
-@dataclass(frozen=True)
-class StandardFormLinearProgram:
-    """Problema de Programação Linear escrito na forma padrão.
+        for constraint in self.constraints:
+            constraint.coefficients.append(0)
 
-    Nesta representação, as variáveis já foram ajustadas para obedecer às
-    condições de não negatividade, e as restrições ficam organizadas pela
-    matriz de coeficientes A, pelas relações e pelo vetor de resultados b.
-    """
-
-    # Número de variáveis na forma padrão.
-    decision_variable_count: int
-
-    # Número de restrições na forma padrão.
-    constraint_count: int
-
-    # Coeficientes da função objetivo na forma padrão.
-    objective_function: list[float]
-
-    # Matriz de coeficientes A das restrições.
-    constraint_matrix: list[list[float]]
-
-    # Relações das restrições após a padronização.
-    constraint_relations: list[ConstraintRelation]
-
-    # Vetor b, isto é, os membros direitos das restrições.
-    results: list[float]
-
-    # Origem de cada variável padronizada: índice da variável original
-    # e fator usado na transformação.
-    variable_sources: list[tuple[int, float]]
+        self.decision_variable_signs.append(DecisionVariableSign.POSITIVE)
