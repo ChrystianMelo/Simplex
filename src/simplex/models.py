@@ -40,7 +40,7 @@ class DecisionVariableSign(IntEnum):
     FREE = 0
 
 
-@dataclass(frozen=True)
+@dataclass
 class Constraint:
     """Representa uma restrição linear do problema.
 
@@ -59,7 +59,7 @@ class Constraint:
     result: float
 
 
-@dataclass(frozen=True)
+@dataclass
 class LinearProgram:
     """Modelo de entrada de um problema de Programação Linear.
 
@@ -85,6 +85,22 @@ class LinearProgram:
     # Lista das restrições lineares do problema.
     constraints: list[Constraint]
 
+    def __init__(
+        self,
+        decision_variable_count: int,
+        constraint_count: int,
+        decision_variable_signs: list[DecisionVariableSign],
+        problem_type: ProblemType,
+        objective_function: list[float],
+        constraints: list[Constraint],
+    ) -> None:
+        self.decision_variable_count = decision_variable_count
+        self.constraint_count = constraint_count
+        self.decision_variable_signs = decision_variable_signs
+        self.problem_type = problem_type
+        self.objective_function = objective_function
+        self.constraints = constraints
+
     def increase_decision_variable_count(self):
         self.decision_variable_count += 1
 
@@ -92,3 +108,4 @@ class LinearProgram:
             constraint.coefficients.append(0)
 
         self.decision_variable_signs.append(DecisionVariableSign.POSITIVE)
+        self.objective_function.append(0)
