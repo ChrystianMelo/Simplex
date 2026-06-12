@@ -27,12 +27,12 @@ def makeMatrixFullRank(A):
     return A, rowsEliminated
 
 
-def pivot_element(A: np.ndarray, pivot_row: int, pivot_col: int):
+def pivot_element(A: list[list[float]], pivot_row: int, pivot_col: int):
     """Realiza o pivoteamento em torno de um elemento de uma matriz.
 
     Parâmetros
     ----------
-    A : numpy.ndarray
+    A : list[list[float]]
         Matriz a ser modificada (geralmente em forma reduzida de linhas ou tableau Simplex).
     pivot_row : int
         Índice da linha do elemento pivô.
@@ -41,26 +41,36 @@ def pivot_element(A: np.ndarray, pivot_row: int, pivot_col: int):
 
     Observações
     -----------
-    - A função espera que o elemento pivô seja não-nulo; 
+    - A função espera que o elemento pivô seja não-nulo;
     - Altera a matriz de entrada in-place.
     """
 
-    assert A[pivot_row, pivot_col] != 0, "Elemento pivô não pode ser zero."
+    assert A[pivot_row][pivot_col] != 0, "Elemento pivô não pode ser zero."
 
-    for i in range(0, A.shape[0]):
+    for i in range(0, len(A)):
         if i != pivot_row:
-            A[i, :] = A[i, :] - A[pivot_row, :] * \
-                (A[i, pivot_col] / A[pivot_row, pivot_col])
+            A[i] = [
+                A[i][j]
+                - A[pivot_row][j]
+                * (A[i][pivot_col] / A[pivot_row][pivot_col])
+                for j in range(0, len(A[i]))
+            ]
 
-    A[pivot_row, :] = A[pivot_row, :] / A[pivot_row, pivot_col]
+    A[pivot_row] = [
+        value / A[pivot_row][pivot_col]
+        for value in A[pivot_row]
+    ]
 
     # Corrige precisão de divisão para evitar valores muito pequenos que deveriam ser zero
-    A[np.isclose(A, 0)] = 0
+    for i in range(0, len(A)):
+        for j in range(0, len(A[i])):
+            if abs(A[i][j]) <= 1e-9:
+                A[i][j] = 0
 
-    for i in range(0, A.shape[0]):
+    for i in range(0, len(A)):
         if i == pivot_row:
-            assert A[i,
-                     pivot_col] == 1, f"Após pivoteamento, o elemento pivô deve ser 1. Encontrado {A[i, pivot_col]} na linha {i}."
+            assert A[i][
+                pivot_col] == 1, f"Após pivoteamento, o elemento pivô deve ser 1. Encontrado {A[i][pivot_col]} na linha {i}."
         else:
-            assert A[i,
-                     pivot_col] == 0, f"Após pivoteamento, elementos na coluna do pivô devem ser zero. Encontrado {A[i, pivot_col]} na linha {i}."
+            assert A[i][
+                pivot_col] == 0, f"Após pivoteamento, elementos na coluna do pivô devem ser zero. Encontrado {A[i][pivot_col]} na linha {i}."
