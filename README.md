@@ -1,7 +1,7 @@
-# Simplex de duas fases
+# Simplex
 
-Implementação do método Simplex para o trabalho prático de DCC035 — Pesquisa
-Operacional (2026.1).
+Implementação do método Simplex para o trabalho prático de Pesquisa
+Operacional.
 
 O programa:
 
