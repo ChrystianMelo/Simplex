@@ -40,6 +40,26 @@ class DecisionVariableSign(IntEnum):
     FREE = 0
 
 
+class ProblemStatus(Enum):
+    """Status da solução do problema de Programação Linear."""
+
+    # Problema inviável: nenhuma solução factível existe.
+    INFEASIBLE = "inviavel"
+
+    # Problema ilimitado: a função objetivo pode crescer indefinidamente.
+    UNBOUNDED = "ilimitado"
+
+    # Problema possui uma única solução ótima.
+    OPTIMAL = "otimo"
+
+    # Problema possui múltiplas soluções ótimas.
+    OPTIMAL_MULTIPLE = "otimo (multiplos)"
+
+    def __str__(self) -> str:
+        """Retorna a representação em string do status."""
+        return f"Status: {self.value}"
+
+
 @dataclass
 class Constraint:
     """Representa uma restrição linear do problema.
@@ -100,6 +120,9 @@ class LinearProgram:
         self.problem_type = problem_type
         self.objective_function = objective_function
         self.constraints = constraints
+        self.original_decision_variable_count = decision_variable_count
+        self.original_decision_variable_signs = decision_variable_signs.copy()
+        self.original_problem_type = problem_type
 
     def increase_decision_variable_count(self):
         self.decision_variable_count += 1

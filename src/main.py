@@ -4,7 +4,9 @@ import argparse
 from dataclasses import dataclass
 from enum import Enum
 
+from simplex.models import ProblemStatus
 from simplex.parser import parse_input
+from simplex.solver import run_simplex
 from simplex.standard_form import to_standard_form
 
 
@@ -72,6 +74,51 @@ def main() -> None:
 
     linear_program = parse_input(raw_input)
     to_standard_form(linear_program)
+
+    objective, solutions, dual, status = run_simplex(
+        linear_program,
+        arguments.pivot_policy.value,
+    )
+    print(status)
+
+    if status == ProblemStatus.INFEASIBLE:
+        if dual:
+            print(
+                " ".join(
+                    arguments.format_number(value)
+                    for value in dual[0]
+                )
+            )
+        return
+
+    if status == ProblemStatus.UNBOUNDED:
+        for solution in solutions:
+            print(
+                " ".join(
+                    arguments.format_number(value)
+                    for value in solution
+                )
+            )
+        return
+
+    print(f"Objetivo: {arguments.format_number(objective)}")
+    print("Solucao:" if len(solutions) == 1 else "Solucoes:")
+    for solution in solutions:
+        print(
+            " ".join(
+                arguments.format_number(value)
+                for value in solution
+            )
+        )
+
+    print("Dual:")
+    if dual:
+        print(
+            " ".join(
+                arguments.format_number(value)
+                for value in dual[0]
+            )
+        )
 
 
 if __name__ == "__main__":
