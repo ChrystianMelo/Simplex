@@ -6,7 +6,12 @@ import pytest
 
 from simplex.models import ProblemStatus
 from simplex.parser import parse_input
-from simplex.solver import run_simplex
+from simplex.solver import (
+    SimplexTraceEvent,
+    find_negative_index,
+    find_pivot_row,
+    run_simplex,
+)
 from simplex.standard_form import to_standard_form
 
 
@@ -122,3 +127,104 @@ max 1
     assert status == ProblemStatus.OPTIMAL
     assert objective == pytest.approx(2.0)
     assert solutions == [[2.0]]
+
+
+def test_find_negative_index_implements_all_pivot_policies() -> None:
+    reduced_costs = [-2.0, -5.0, -1.0, -5.0]
+
+    assert find_negative_index(reduced_costs, "largest") == 1
+    assert find_negative_index(reduced_costs, "smallest") == 2
+    assert find_negative_index(reduced_costs, "bland") == 0
+
+
+def test_find_pivot_row_uses_bland_to_break_minimum_ratio_ties() -> None:
+    matrix = [
+        [0.0, 0.0],
+        [1.0, 2.0],
+        [2.0, 4.0],
+    ]
+
+    pivot_row = find_pivot_row(
+        matrix,
+        pivot_col=0,
+        start_row=1,
+        end_row=2,
+        basis=[8, 3],
+    )
+
+    assert pivot_row == 2
+
+
+@pytest.mark.parametrize("policy", ["largest", "bland", "smallest"])
+def test_run_simplex_terminates_on_degenerate_cycling_example(
+    policy: str,
+) -> None:
+    linear_program = parse_input(
+        """\
+4
+3
+1 1 1 1
+max 10 -57 -9 -24
+0.5 -5.5 -2.5 9 <= 0
+0.5 -1.5 -0.5 1 <= 0
+1 0 0 0 <= 1
+"""
+    )
+    to_standard_form(linear_program)
+
+    objective, solutions, _, status = run_simplex(linear_program, policy)
+
+    assert status == ProblemStatus.OPTIMAL
+    assert objective == pytest.approx(1.0)
+    assert solutions[0] == pytest.approx([1.0, 0.0, 1.0, 0.0])
+
+
+def test_run_simplex_reports_two_distinct_multiple_optima() -> None:
+    linear_program = parse_input(
+        """\
+2
+3
+1 1
+max 1 1
+1 1 <= 1
+1 0 <= 1
+0 1 <= 1
+"""
+    )
+    to_standard_form(linear_program)
+
+    objective, solutions, _, status = run_simplex(linear_program, "bland")
+
+    assert status == ProblemStatus.OPTIMAL_MULTIPLE
+    assert objective == pytest.approx(1.0)
+    assert len(solutions) == 2
+    assert solutions[0] != solutions[1]
+
+
+def test_trace_contains_both_phases_and_alternate_optimum_pivot() -> None:
+    linear_program = parse_input(
+        """\
+2
+3
+1 1
+max 1 1
+1 1 <= 1
+1 0 <= 1
+0 1 <= 1
+"""
+    )
+    to_standard_form(linear_program)
+    events: list[SimplexTraceEvent] = []
+
+    run_simplex(linear_program, "bland", trace_callback=events.append)
+
+    assert {event.phase for event in events} == {
+        "Fase I (PL auxiliar)",
+        "Fase II (PL original)",
+    }
+    assert any(event.action == "Pivoteamento" for event in events)
+    assert any(
+        event.action == "Pivoteamento para solucao otima alternativa"
+        for event in events
+    )
+    assert all(event.column_labels[-1] == "b" for event in events)

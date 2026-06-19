@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Callable
+
 from simplex.models import (
     DecisionVariableSign,
     LinearProgram,
@@ -10,6 +13,58 @@ from utils.matrixUtils import pivot_element
 
 MatrixPosition = tuple[int, int]
 TOLERANCE = 1e-9
+
+
+@dataclass(frozen=True)
+class SimplexTraceEvent:
+    """Snapshot de uma etapa do Simplex para apresentação no console."""
+
+    phase: str
+    iteration: int
+    action: str
+    matrix: list[list[float]]
+    basis: list[int]
+    column_labels: list[str]
+    entering_col: int | None = None
+    leaving_row: int | None = None
+    leaving_col: int | None = None
+    pivot_policy: str | None = None
+
+
+TraceCallback = Callable[[SimplexTraceEvent], None]
+
+
+def emit_trace(
+    trace_callback: TraceCallback | None,
+    *,
+    phase: str,
+    iteration: int,
+    action: str,
+    matrix: list[list[float]],
+    basis: list[int],
+    column_labels: list[str],
+    entering_col: int | None = None,
+    leaving_row: int | None = None,
+    leaving_col: int | None = None,
+    pivot_policy: str | None = None,
+) -> None:
+    if trace_callback is None:
+        return
+
+    trace_callback(
+        SimplexTraceEvent(
+            phase=phase,
+            iteration=iteration,
+            action=action,
+            matrix=[row.copy() for row in matrix],
+            basis=basis.copy(),
+            column_labels=column_labels.copy(),
+            entering_col=entering_col,
+            leaving_row=leaving_row,
+            leaving_col=leaving_col,
+            pivot_policy=pivot_policy,
+        )
+    )
 
 
 def find_negative_index(
@@ -27,9 +82,21 @@ def find_negative_index(
         return -1
 
     if pivot_policy == "largest":
-        return min(negative_indices, key=lambda index: row_slice[index])
+        return min(
+            negative_indices,
+            key=lambda index: (row_slice[index], index),
+        )
     if pivot_policy == "smallest":
-        return max(negative_indices, key=lambda index: row_slice[index])
+        smallest_value = max(row_slice[index] for index in negative_indices)
+        return min(
+            index
+            for index in negative_indices
+            if abs(row_slice[index] - smallest_value) <= tol
+        )
+    if pivot_policy != "bland":
+        raise ValueError(
+            "Politica de pivo invalida: esperado 'largest', 'bland' ou 'smallest'."
+        )
 
     return negative_indices[0]
 
@@ -99,9 +166,10 @@ def find_pivot_row(
     pivot_col: int,
     start_row: int,
     end_row: int,
+    basis: list[int] | None = None,
     tol: float = TOLERANCE,
 ) -> int:
-    """Retorna a linha do teste da razão mínima ou -1 se não houver."""
+    """Retorna a linha da razão mínima, com desempate pela regra de Bland."""
     pivot_row = -1
     minimum_ratio = float("inf")
 
@@ -119,6 +187,14 @@ def find_pivot_row(
         if ratio < minimum_ratio - tol:
             minimum_ratio = ratio
             pivot_row = row
+        elif abs(ratio - minimum_ratio) <= tol and pivot_row != -1:
+            if basis is None:
+                continue
+
+            candidate_basis_col = basis[row - start_row]
+            current_basis_col = basis[pivot_row - start_row]
+            if candidate_basis_col < current_basis_col:
+                pivot_row = row
 
     return pivot_row
 
@@ -195,17 +271,70 @@ def pivot_initial_solution(
     constraint_matrix_end: MatrixPosition,
     basis: list[int],
     pivot_policy: str = "bland",
+    phase: str = "Simplex",
+    column_labels: list[str] | None = None,
+    trace_callback: TraceCallback | None = None,
 ) -> tuple[ProblemStatus, int | None]:
     """Executa iterações do Simplex primal para a função objetivo atual."""
+    active_policy = pivot_policy
+    seen_bases: set[tuple[int, ...]] = set()
+    iteration = 0
+    labels = column_labels or [
+        f"c{index}" for index in range(len(combined_matrix[0]) - 1)
+    ] + ["b"]
+
+    emit_trace(
+        trace_callback,
+        phase=phase,
+        iteration=iteration,
+        action="Tableau inicial",
+        matrix=combined_matrix,
+        basis=basis,
+        column_labels=labels,
+        pivot_policy=active_policy,
+    )
+
     while True:
+        basis_signature = tuple(basis)
+        if basis_signature in seen_bases:
+            if active_policy == "bland":
+                raise RuntimeError(
+                    "O Simplex repetiu uma base mesmo com a regra de Bland."
+                )
+
+            active_policy = "bland"
+            seen_bases.clear()
+            emit_trace(
+                trace_callback,
+                phase=phase,
+                iteration=iteration,
+                action="Ciclo detectado; continuando com a regra de Bland",
+                matrix=combined_matrix,
+                basis=basis,
+                column_labels=labels,
+                pivot_policy=active_policy,
+            )
+
+        seen_bases.add(basis_signature)
+
         pivot_col_index = find_negative_index(
             combined_matrix[objective_function_start[0]][
                 objective_function_start[1]:objective_function_end[1]
             ],
-            pivot_policy=pivot_policy,
+            pivot_policy=active_policy,
         )
 
         if pivot_col_index == -1:
+            emit_trace(
+                trace_callback,
+                phase=phase,
+                iteration=iteration,
+                action="Solucao otima para esta fase",
+                matrix=combined_matrix,
+                basis=basis,
+                column_labels=labels,
+                pivot_policy=active_policy,
+            )
             return ProblemStatus.OPTIMAL, None
 
         pivot_col = objective_function_start[1] + pivot_col_index
@@ -214,17 +343,45 @@ def pivot_initial_solution(
             pivot_col=pivot_col,
             start_row=constraint_matrix_start[0],
             end_row=constraint_matrix_end[0],
+            basis=basis,
         )
 
         if pivot_row == -1:
+            emit_trace(
+                trace_callback,
+                phase=phase,
+                iteration=iteration,
+                action="Nenhuma linha pode sair da base",
+                matrix=combined_matrix,
+                basis=basis,
+                column_labels=labels,
+                entering_col=pivot_col,
+                pivot_policy=active_policy,
+            )
             return ProblemStatus.UNBOUNDED, pivot_col
 
+        leaving_row = pivot_row
+        leaving_col = basis[pivot_row - constraint_matrix_start[0]]
         pivot_element(
             combined_matrix,
             pivot_row=pivot_row,
             pivot_col=pivot_col,
         )
         basis[pivot_row - constraint_matrix_start[0]] = pivot_col
+        iteration += 1
+        emit_trace(
+            trace_callback,
+            phase=phase,
+            iteration=iteration,
+            action="Pivoteamento",
+            matrix=combined_matrix,
+            basis=basis,
+            column_labels=labels,
+            entering_col=pivot_col,
+            leaving_row=leaving_row,
+            leaving_col=leaving_col,
+            pivot_policy=active_policy,
+        )
 
 
 def remove_artificial_variables(
@@ -304,8 +461,14 @@ def find_optimal_solutions(
     basis: list[int],
     variable_count: int,
     tol: float = TOLERANCE,
+    trace_callback: TraceCallback | None = None,
+    column_labels: list[str] | None = None,
+    next_iteration: int = 1,
 ) -> tuple[dict[tuple[float, ...], list[int]], ProblemStatus]:
     solutions: dict[tuple[float, ...], list[int]] = {}
+    labels = column_labels or [
+        f"c{index}" for index in range(len(combined_matrix[0]) - 1)
+    ] + ["b"]
 
     solution = extract_solution(
         combined_matrix,
@@ -332,6 +495,7 @@ def find_optimal_solutions(
             pivot_col=col,
             start_row=constraint_matrix_start[0],
             end_row=constraint_matrix_end[0],
+            basis=basis,
         )
 
         if pivot_row == -1:
@@ -351,12 +515,27 @@ def find_optimal_solutions(
 
         alternate_matrix = [row.copy() for row in combined_matrix]
         alternate_basis = basis.copy()
+        leaving_col = alternate_basis[
+            pivot_row - constraint_matrix_start[0]
+        ]
         pivot_element(
             alternate_matrix,
             pivot_row=pivot_row,
             pivot_col=col,
         )
         alternate_basis[pivot_row - constraint_matrix_start[0]] = col
+        emit_trace(
+            trace_callback,
+            phase="Fase II (PL original)",
+            iteration=next_iteration,
+            action="Pivoteamento para solucao otima alternativa",
+            matrix=alternate_matrix,
+            basis=alternate_basis,
+            column_labels=labels,
+            entering_col=col,
+            leaving_row=pivot_row,
+            leaving_col=leaving_col,
+        )
 
         alternate_solution = extract_solution(
             alternate_matrix,
@@ -406,6 +585,7 @@ def restore_original_variables(
 def run_simplex(
     lp: LinearProgram,
     pivot_policy: str = "bland",
+    trace_callback: TraceCallback | None = None,
 ) -> tuple[float, list[list[float]], list[list[float]], ProblemStatus]:
     """Resolve uma PL em forma padrão pelo Simplex primal de duas fases.
 
@@ -423,6 +603,12 @@ def run_simplex(
     dual_block_width = constraint_count
     variable_start_col = dual_block_width
     artificial_start_col = variable_start_col + variable_count
+    phase_one_labels = (
+        [f"y{index}" for index in range(constraint_count)]
+        + [f"x{index}" for index in range(variable_count)]
+        + [f"a{index}" for index in range(constraint_count)]
+        + ["b"]
+    )
 
     basis = [
         artificial_start_col + constraint_index
@@ -455,6 +641,9 @@ def run_simplex(
         constraint_matrix_end,
         basis,
         pivot_policy,
+        phase="Fase I (PL auxiliar)",
+        column_labels=phase_one_labels,
+        trace_callback=trace_callback,
     )
 
     if (
@@ -477,6 +666,11 @@ def run_simplex(
         artificial_start_col,
         constraint_count,
     )
+    phase_two_labels = (
+        [f"y{index}" for index in range(constraint_count)]
+        + [f"x{index}" for index in range(variable_count)]
+        + ["b"]
+    )
 
     set_objective_function(
         combined_matrix,
@@ -490,6 +684,14 @@ def run_simplex(
     objective_function_end = (0, col_count - 1)
     constraint_matrix_end = (row_count - 1, col_count - 1)
 
+    last_phase_two_iteration = 0
+
+    def phase_two_trace(event: SimplexTraceEvent) -> None:
+        nonlocal last_phase_two_iteration
+        last_phase_two_iteration = max(last_phase_two_iteration, event.iteration)
+        if trace_callback is not None:
+            trace_callback(event)
+
     phase_two_status, unbounded_col = pivot_initial_solution(
         combined_matrix,
         objective_function_start,
@@ -498,6 +700,9 @@ def run_simplex(
         constraint_matrix_end,
         basis,
         pivot_policy,
+        phase="Fase II (PL original)",
+        column_labels=phase_two_labels,
+        trace_callback=phase_two_trace if trace_callback is not None else None,
     )
 
     if phase_two_status == ProblemStatus.UNBOUNDED and unbounded_col is not None:
@@ -534,6 +739,9 @@ def run_simplex(
         constraint_matrix_end,
         basis,
         variable_count,
+        trace_callback=trace_callback,
+        column_labels=phase_two_labels,
+        next_iteration=last_phase_two_iteration + 1,
     )
 
     original_solutions_by_value: dict[tuple[float, ...], list[float]] = {}

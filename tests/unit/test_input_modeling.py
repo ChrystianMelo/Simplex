@@ -146,3 +146,20 @@ max 1 2 3
         DecisionVariableSign.NEGATIVE,
         DecisionVariableSign.FREE,
     ]
+
+
+def test_parse_input_accepts_objective_coefficients_without_max_keyword() -> None:
+    """Aceita exatamente o formato apresentado no enunciado do trabalho."""
+    raw_input = """\
+2
+2
+1 0
+1 1
+1 -1 <= 2
+1 1 >= 1
+"""
+
+    linear_program = parse_input(raw_input)
+
+    assert linear_program.problem_type == ProblemType.MAXIMIZATION
+    assert linear_program.objective_function == [1.0, 1.0]

@@ -12,14 +12,16 @@ license = {text = "MIT"}
 authors = [
     {name = "Chrystian Melo", email = "meloo.chrys@gmail.com"}
 ]
-dependencies = []
+dependencies = [
+    "numpy>=1.24",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["simplex*"]
+include = ["simplex*", "utils*"]
 
 [tool.black]
 line-length = 88

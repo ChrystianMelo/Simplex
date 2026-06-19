@@ -53,9 +53,16 @@ def parse_input(raw_input: str) -> LinearProgram:
         )
 
     objective_tokens = lines[3].split()
-    problem_type = parse_problem_type(objective_tokens[0])
+    if len(objective_tokens) == decision_variable_count:
+        # O formato mostrado no enunciado traz apenas os coeficientes e
+        # apresenta a PL como maximização.
+        problem_type = ProblemType.MAXIMIZATION
+        coefficient_tokens = objective_tokens
+    else:
+        problem_type = parse_problem_type(objective_tokens[0])
+        coefficient_tokens = objective_tokens[1:]
 
-    objective_function = [parse_number(value) for value in objective_tokens[1:]]
+    objective_function = [parse_number(value) for value in coefficient_tokens]
     if len(objective_function) != decision_variable_count:
         raise ValueError(
             "Quantidade de coeficientes da funcao objetivo diferente do numero de "

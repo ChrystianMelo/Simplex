@@ -7,4 +7,4 @@ echo "Activating virtual environment..."
 source venv/bin/activate
 
 echo "Running project..."
-python src/main.py
+python src/main.py "$@"
